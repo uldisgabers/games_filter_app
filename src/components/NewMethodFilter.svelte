@@ -61,32 +61,71 @@
   let selectedCountry = "All";
 
   const retentionFilterFunc = () => {
-    filteredRetention = retention;
-    countries = [...new Set(filteredRetention.map((item) => item.country))].sort();
-   
-    if (selectedGame.name === "All") {
-      filteredRetention = retention;
-    } else {
-      countries = [...new Set(filteredRetention.map((item) => item.country))].sort();
-      filteredRetention = retention.filter((item) => {
-        return item.app_id === selectedGame.app_id;
-      });
+    // filteredRetention = retention;
+    // countries = [
+    //   ...new Set(filteredRetention.map((item) => item.country)),
+    // ].sort();
 
-      if (selectedVersion !== "All") {
-        countries = [...new Set(filteredRetention.map((item) => item.country))].sort();
+    // if (selectedGame.name === "All") {
+    //   countries = [
+    //     ...new Set(filteredRetention.map((item) => item.country)),
+    //   ].sort();
 
-        filteredRetention = filteredRetention.filter((item) => {
-          return item.app_ver === selectedVersion;
-        });
+    //   filteredRetention = retention;
+    // } else {
+    //   countries = [
+    //     ...new Set(filteredRetention.map((item) => item.country)),
+    //   ].sort();
+    //   filteredRetention = retention.filter((item) => {
+    //     return item.app_id === selectedGame.app_id;
+    //   });
 
-        if (selectedCountry !== "All") {
-          filteredRetention = filteredRetention.filter((item) => {
-            return item.country === selectedCountry
-          })
-        }
-      }
+    //   if (selectedVersion !== "All") {
+    //     countries = [
+    //       ...new Set(filteredRetention.map((item) => item.country)),
+    //     ].sort();
+
+    //     filteredRetention = filteredRetention.filter((item) => {
+    //       return item.app_ver === selectedVersion;
+    //     });
+
+    //     if (selectedCountry !== "All") {
+    //       filteredRetention = filteredRetention.filter((item) => {
+    //         return item.country === selectedCountry;
+    //       });
+    //     }
+    //   }
+
+    //   if (selectedCountry !== "All") {
+    //     countries = [
+    //       ...new Set(filteredRetention.map((item) => item.country)),
+    //     ].sort();
+
+    //     filteredRetention = filteredRetention.filter((item) => {
+    //       return item.country === selectedCountry;
+    //     });
+    //   }
+    // }
+
+    let filtered = retention.slice(); // Make a shallow copy of the retention array
+
+    if (selectedGame.name !== "All") {
+      filtered = filtered.filter((item) => item.app_id === selectedGame.app_id);
     }
 
+    if (selectedVersion !== "All") {
+      filtered = filtered.filter((item) => item.app_ver === selectedVersion);
+    }
+
+    if (selectedCountry !== "All") {
+      filtered = filtered.filter((item) => item.country === selectedCountry);
+    }
+
+    // Update countries array after filtering
+    countries = [...new Set(filtered.map((item) => item.country))].sort();
+
+    // Update filteredRetention with the final filtered array
+    filteredRetention = filtered;
   };
 
   const handleGameInput = (e: any) => {
@@ -119,6 +158,18 @@
     );
   };
 
+  const handleCountryInput = (e: any) => {
+    countries = [
+      ...new Set(
+        filteredRetention
+          .filter((item) =>
+            item.country.toLowerCase().includes(e.target.value.toLowerCase()),
+          )
+          .map((item) => item.country),
+      ),
+    ];
+  };
+
   const getDevicesForVersionsCount = (array: Retention[], version: string) => {
     let count = 0;
     array.forEach((item) => {
@@ -147,6 +198,14 @@
   let isCountryFilterFieldOpen = false;
   const toggleCountryFilterField = () => {
     isCountryFilterFieldOpen = !isCountryFilterFieldOpen;
+  };
+
+  const showFullNameIfTooLong = (name: string) => {
+    if (name.length > 15) {
+      return name;
+    } else {
+      return null;
+    }
   };
 </script>
 
@@ -181,6 +240,7 @@
             icon: "",
           };
           selectedVersion = "All";
+          selectedCountry = "All";
           retentionFilterFunc();
           getVersions();
         }}
@@ -197,6 +257,7 @@
             toggleFilterField();
             selectedGame = game;
             selectedVersion = "All";
+            selectedCountry = "All";
 
             retentionFilterFunc();
             getVersions();
@@ -275,7 +336,7 @@
       style="display: {isCountryFilterFieldOpen ? 'block' : 'none'};"
     >
       <div>
-        <input class="filter-input" on:input={handleVersionInput} />
+        <input class="filter-input" on:input={handleCountryInput} />
       </div>
       <!-- svelte-ignore a11y-click-events-have-key-events -->
       <!-- svelte-ignore a11y-no-static-element-interactions -->
@@ -302,8 +363,13 @@
             toggleCountryFilterField();
             retentionFilterFunc();
           }}
+          title={showFullNameIfTooLong(country)}
         >
-          {country}
+          {#if country.length > 15}
+            {country.slice(0, 15) + "..."}
+          {:else}
+            {country}
+          {/if}
         </div>
       {/each}
     </div>
