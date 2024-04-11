@@ -22,6 +22,7 @@
   let filteredGames: Game[] = [];
   let filteredRetention: Retention[] = [];
   let filteredVersions: string[] = [];
+  let filteredCountries: string[] = [];
 
   onMount(async () => {
     fetch("https://storage.googleapis.com/estoty-temp/games.json")
@@ -46,6 +47,7 @@
         countries = [...new Set(retention.map((item) => item.country))].sort(); // get the unique countries data
 
         getVersions();
+        // getCountries(retention);
       })
       .catch((error) => {
         console.log(error);
@@ -55,7 +57,7 @@
   let selectedGame: Game = {
     app_id: "1",
     name: "All",
-    icon: "",
+    icon: "", // default selection of All
   };
   let selectedVersion = "All";
   let selectedCountry = "All";
@@ -122,7 +124,7 @@
     }
 
     // Update countries array after filtering
-    countries = [...new Set(filtered.map((item) => item.country))].sort();
+    // countries = [...new Set(filtered.map((item) => item.country))].sort();
 
     // Update filteredRetention with the final filtered array
     filteredRetention = filtered;
@@ -134,13 +136,84 @@
     });
   };
 
+  // const getVersions = () => {
+  //   versions = [...new Set(filteredRetention.map((item) => item.app_ver))]; // get the unique version data
+  //   versions = versions.sort(
+  //     (a, b) =>
+  //       Number(b.slice(0, b.indexOf("."))) - Number(a.slice(0, a.indexOf("."))),
+  //   ); // sort it decending
+  //   return versions;
+  // };
+
   const getVersions = () => {
-    versions = [...new Set(filteredRetention.map((item) => item.app_ver))]; // get the unique version data
-    versions = versions.sort(
+    let filteredVersions: string[] = [];
+
+    retention.forEach((item) => {
+      if (
+        selectedGame.app_id === item.app_id &&
+        selectedCountry === item.country &&
+        filteredVersions.indexOf(item.app_ver) === -1
+      ) {
+        filteredVersions.push(item.app_ver);
+      } else if (
+        selectedGame.app_id === item.app_id &&
+        selectedCountry === "All" &&
+        filteredVersions.indexOf(item.app_ver) === -1
+      ) {
+        filteredVersions.push(item.app_ver);
+      } else if (
+        selectedGame.app_id === "1" &&
+        selectedCountry === item.country &&
+        filteredVersions.indexOf(item.app_ver) === -1
+      ) {
+        filteredVersions.push(item.app_ver);
+      } else if (
+        selectedGame.app_id === "1" &&
+        selectedCountry === "All" &&
+        filteredVersions.indexOf(item.app_ver) === -1
+      ) {
+        filteredVersions.push(item.app_ver);
+      }
+    });
+
+    versions = filteredVersions.sort(
       (a, b) =>
         Number(b.slice(0, b.indexOf("."))) - Number(a.slice(0, a.indexOf("."))),
-    ); // sort it decending
-    return versions;
+    );
+  };
+
+  const getCountries = (array: Retention[]) => {
+    let filteredCountries: string[] = [];
+
+    array.forEach((item) => {
+      if (
+        selectedGame.app_id === item.app_id &&
+        selectedVersion === item.app_ver &&
+        filteredCountries.indexOf(item.country) === -1
+      ) {
+        filteredCountries.push(item.country);
+      } else if (
+        selectedGame.app_id === item.app_id &&
+        selectedVersion === "All" &&
+        filteredCountries.indexOf(item.country) === -1
+      ) {
+        filteredCountries.push(item.country);
+      } else if (
+        selectedGame.app_id === "1" &&
+        selectedVersion === item.app_ver &&
+        filteredCountries.indexOf(item.country) === -1
+      ) {
+        filteredCountries.push(item.country);
+      } else if (
+        selectedGame.app_id === "1" &&
+        selectedVersion === "All" &&
+        filteredCountries.indexOf(item.country) === -1
+      ) {
+        filteredCountries.push(item.country);
+      }
+    });
+
+    countries = filteredCountries;
   };
 
   const handleVersionInput = (e: any) => {
@@ -170,14 +243,49 @@
     ];
   };
 
-  const getDevicesForVersionsCount = (array: Retention[], version: string) => {
+  const sumArr = (arr: number[]) => {
+    return arr.reduce(
+      (accumulator, currentValue) => accumulator + currentValue,
+      0,
+    );
+  };
+
+  const getDevicesForVersionsCount = (
+    array: Retention[],
+    game: string,
+    version: string,
+    country: string,
+  ) => {
     let count = 0;
     array.forEach((item) => {
-      if (item.app_ver === version) {
-        count += item.days.reduce(
-          (accumulator, currentValue) => accumulator + currentValue,
-          0,
-        );
+      if (
+        item.app_ver === version &&
+        item.app_id === game &&
+        item.country === country
+      ) {
+        count += sumArr(item.days);
+        return;
+      } else if (
+        item.app_ver === version &&
+        item.app_id === game &&
+        country === "All"
+      ) {
+        count += sumArr(item.days);
+        return;
+      } else if (
+        item.app_ver === version &&
+        item.country === country &&
+        game === "1"
+      ) {
+        count += sumArr(item.days);
+        return;
+      } else if (
+        item.app_ver === version &&
+        country === "All" &&
+        game === "1"
+      ) {
+        count += sumArr(item.days);
+        return;
       }
     });
     return count;
@@ -243,6 +351,7 @@
           selectedCountry = "All";
           retentionFilterFunc();
           getVersions();
+          getCountries(retention);
         }}
       >
         All
@@ -261,9 +370,7 @@
 
             retentionFilterFunc();
             getVersions();
-            // filteredRetention = retention.filter((item) => {
-            //   return game.app_id === item.app_id;
-            // });
+            getCountries(retention);
           }}
         >
           <img src={game.icon} width="20" height="20" alt={game.name} />
@@ -298,6 +405,7 @@
           filteredRetention = retention;
           selectedVersion = "All";
           retentionFilterFunc();
+          getCountries(retention);
         }}
       >
         All
@@ -312,11 +420,14 @@
             selectedVersion = version;
             toggleVersionFilterField();
             retentionFilterFunc();
+            getCountries(retention);
           }}
         >
           <b>{version}</b> ({getDevicesForVersionsCount(
-            filteredRetention,
+            retention,
+            selectedGame.app_id,
             version,
+            selectedCountry,
           )})
         </div>
       {/each}
@@ -348,6 +459,7 @@
           // filteredRetention = retention;
           selectedCountry = "All";
           retentionFilterFunc();
+          getVersions();
         }}
       >
         All
@@ -362,6 +474,7 @@
             selectedCountry = country;
             toggleCountryFilterField();
             retentionFilterFunc();
+            getVersions();
           }}
           title={showFullNameIfTooLong(country)}
         >
