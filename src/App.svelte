@@ -251,7 +251,7 @@
     datasets: [
       {
         label: "",
-        data: [100, 19, 3, 5, 2, 3, 1, 1],
+        data: [1, 1, 1, 1, 1, 1, 1, 1],
         backgroundColor: ["rgba(98,  182, 239,0.4)"],
         borderWidth: 2,
         borderColor: ["rgba(98,  182, 239, 1)"],
