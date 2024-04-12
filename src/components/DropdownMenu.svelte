@@ -1,9 +1,9 @@
 <script lang="ts">
   export let retention: Retention[];
-  export let filteredRetention: Retention[]
-  export let filteredGames: Game[]
-  export let games: Game[]
-  export let selectedGame: Game
+  export let filteredRetention: Retention[];
+  export let filteredGames: Game[];
+  export let games: Game[];
+  export let selectedGame: Game;
 
   type Game = {
     app_id: string;
@@ -18,58 +18,71 @@
     days: number[];
   };
 
-
   const handleGameInput = (e: any) => {
     filteredGames = games.filter((game) => {
       return game.name.toLowerCase().includes(e.target.value.toLowerCase());
     });
   };
 
-  let isFilterFieldOpen = false;
+  let isGameFilterFieldOpen = false;
   const toggleFilterField = () => {
-    isFilterFieldOpen = !isFilterFieldOpen;
+    isGameFilterFieldOpen = !isGameFilterFieldOpen;
   };
 </script>
 
-<!-- svelte-ignore a11y-click-events-have-key-events -->
-<!-- svelte-ignore a11y-no-static-element-interactions -->
-<div>
-  <div class="dropdown-search" on:click={toggleFilterField}>{selectedGame}</div>
+<div class="dropdown">
+  <!-- svelte-ignore a11y-interactive-supports-focus -->
+  <div
+    class="dropdown-search"
+    tabIndex="0"
+    on:click={toggleFilterField}
+    role="button"
+    on:keydown={toggleFilterField}
+  >
+    {selectedGame.name}
+  </div>
   <div
     class="dropdown-search-open"
-    style="display: {isFilterFieldOpen ? 'block' : 'none'};"
+    style="display: {isGameFilterFieldOpen ? 'block' : 'none'};"
   >
     <div>
       <input class="filter-input" on:input={handleGameInput} />
     </div>
-    <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <!-- svelte-ignore a11y-no-static-element-interactions -->
+
     <div
       class="dropdown-option"
+      tabindex="0"
       on:click={(e) => {
         e.preventDefault();
+
         toggleFilterField();
         filteredRetention = retention;
-        selectedGame = "All";
-  
+        selectedGame = {
+          app_id: "1",
+          name: "All",
+          icon: "",
+        };
+      }}
+      role="button"
+      on:keydown={(e) => {
+        e.preventDefault();
+        toggleFilterField();
       }}
     >
       All
     </div>
     {#each filteredGames as game}
-      <!-- svelte-ignore a11y-click-events-have-key-events -->
-      <!-- svelte-ignore a11y-no-static-element-interactions -->
       <div
         class="dropdown-option"
+        tabindex="0"
         on:click={(e) => {
           e.preventDefault();
           toggleFilterField();
-          selectedGame = game.name;
-         
-
-          filteredRetention = retention.filter((item) => {
-            return game.app_id === item.app_id;
-          });
+          selectedGame = game;
+        }}
+        role="button"
+        on:keydown={(e) => {
+          e.preventDefault();
         }}
       >
         <img src={game.icon} width="20" height="20" alt={game.name} />
@@ -82,6 +95,7 @@
 <style>
   .dropdown-search {
     max-width: 300px;
+    min-width: 300px;
     width: 100%;
     background-color: rgb(143, 201, 255);
     color: #fff;
@@ -97,6 +111,7 @@
   }
 
   .dropdown-search-open {
+    z-index: 10;
     max-width: 300px;
     width: 100%;
     color: #000000;
@@ -121,5 +136,15 @@
 
   .dropdown-option:hover {
     background-color: rgb(145, 199, 250);
+  }
+
+  .dropdown {
+    position: relative;
+    display: inline-block;
+  }
+
+  ::placeholder {
+    color: #fff;
+    opacity: 1;
   }
 </style>

@@ -1,6 +1,27 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import NewMethodFilter from "./components/NewMethodFilter.svelte"
+  import { Bar } from "svelte-chartjs";
+  import DropdownMenu from "./components/DropdownMenu.svelte";
+  import Table from "./components/Table.svelte";
+
+  import {
+    Chart,
+    Title,
+    Tooltip,
+    Legend,
+    BarElement,
+    CategoryScale,
+    LinearScale,
+  } from "chart.js";
+
+  Chart.register(
+    Title,
+    Tooltip,
+    Legend,
+    BarElement,
+    CategoryScale,
+    LinearScale,
+  );
 
   type Game = {
     app_id: string;
@@ -15,14 +36,29 @@
     days: number[];
   };
 
+  type CountriesWithDevices = {
+    name: string;
+    devices: number;
+  };
+
   let games: Game[] = [];
   let retention: Retention[] = [];
   let versions: string[] = [];
-  let countries: string[] = [];
 
   let filteredGames: Game[] = [];
   let filteredRetention: Retention[] = [];
-  let filteredVersions: string[] = [];
+  let countriesWithDevices: CountriesWithDevices[] = [];
+
+  let selectedGame: Game = {
+    app_id: "1",
+    name: "All",
+    icon: "", // default selection of All
+  };
+  let selectedVersion = "All";
+  let selectedCountry = "All";
+
+  let showTable = false;
+  let showChart = false;
 
   onMount(async () => {
     fetch("https://storage.googleapis.com/estoty-temp/games.json")
@@ -44,32 +80,32 @@
 
         filteredRetention = retention;
 
-        countries = [...new Set(retention.map((item) => item.country))].sort(); // get the unique countries data
-      
-        getVersions()
+        getVersions();
+
+        getCountriesWithDeviceCounts(retention);
       })
       .catch((error) => {
         console.log(error);
       });
   });
 
-  const handleGameInput = (e: any) => {
-    filteredGames = games.filter((game) => {
-      return game.name.toLowerCase().includes(e.target.value.toLowerCase());
-    });
-  };
+  const retentionFilterFunc = () => {
+    let filtered = retention.slice();
 
-  // const getVersions = (retentionArr: Retention[]) => {
-  const getVersions = () => {
-    versions = [...new Set(filteredRetention.map((item) => item.app_ver))]; // get the unique version data
-    versions = versions.sort(
-      (a, b) =>
-        Number(b.slice(0, b.indexOf("."))) - Number(a.slice(0, a.indexOf("."))),
-    ); // sort it decending
-    return versions;
-  };
+    if (selectedGame.name !== "All") {
+      filtered = filtered.filter((item) => item.app_id === selectedGame.app_id);
+    }
 
-  
+    if (selectedVersion !== "All") {
+      filtered = filtered.filter((item) => item.app_ver === selectedVersion);
+    }
+
+    if (selectedCountry !== "All") {
+      filtered = filtered.filter((item) => item.country === selectedCountry);
+    }
+
+    filteredRetention = filtered;
+  };
 
   const handleVersionInput = (e: any) => {
     versions = [
@@ -86,28 +122,110 @@
     );
   };
 
-  const getDevicesForVersionsCount = (array: Retention[], version: string) => {
+  const handleCountryInput = (e: any) => {
+    getCountriesWithDeviceCounts(retention);
+
+    countriesWithDevices = [
+      ...new Set(
+        countriesWithDevices
+          .filter((item) =>
+            item.name.toLowerCase().includes(e.target.value.toLowerCase()),
+          )
+          .map((item) => ({
+            name: item.name,
+            devices: item.devices,
+          })),
+      ),
+    ];
+  };
+
+  const getVersions = () => {
+    let filteredVersions: string[] = [];
+
+    retention.forEach((item) => {
+      if (
+        (selectedGame.app_id === item.app_id || selectedGame.app_id === "1") &&
+        (selectedCountry === item.country || selectedCountry === "All") &&
+        filteredVersions.indexOf(item.app_ver) === -1
+      ) {
+        filteredVersions.push(item.app_ver);
+      }
+    });
+
+    versions = filteredVersions.sort(
+      (a, b) =>
+        Number(b.slice(0, b.indexOf("."))) - Number(a.slice(0, a.indexOf("."))),
+    );
+  };
+
+  const getDevicesForVersionsCount = (
+    array: Retention[],
+    game: string,
+    version: string,
+    country: string,
+  ) => {
     let count = 0;
     array.forEach((item) => {
-      if (item.app_ver === version) {
-        count += item.days.reduce(
-          (accumulator, currentValue) => accumulator + currentValue,
-          0,
-        );
+      if (
+        (item.app_ver === version || version === "All") &&
+        (item.app_id === game || game === "1") &&
+        (item.country === country || country === "All")
+      ) {
+        count += item.days[0];
+        return;
+      }
+    });
+
+    return count;
+  };
+
+  const getDevicesForCountryCount = (
+    array: Retention[],
+    game: string,
+    version: string,
+    country: string,
+  ) => {
+    let count = 0;
+    array.forEach((item) => {
+      if (
+        (item.app_ver === version || version === "All") &&
+        (item.app_id === game || game === "1") &&
+        (item.country === country || country === "All")
+      ) {
+        count += item.days[0];
       }
     });
     return count;
   };
 
-  let isGameSelected = false;
+  const getCountriesWithDeviceCounts = (array: Retention[]) => {
+    let filteredCountries: string[] = [];
 
-  let selectedGame = "All";
-  let selectedVersion = "All";
-  let selectedCountry = "All"
+    array.forEach((item) => {
+      if (
+        (selectedGame.app_id === item.app_id || selectedGame.app_id === "1") &&
+        (selectedVersion === item.app_ver || selectedVersion === "All") &&
+        filteredCountries.indexOf(item.country) === -1
+      ) {
+        filteredCountries.push(item.country);
+      }
+    });
 
-  let isGameFilterFieldOpen = false;
-  const toggleFilterField = () => {
-    isGameFilterFieldOpen = !isGameFilterFieldOpen;
+    const countriesWithCounts = filteredCountries.map((country) => ({
+      name: country,
+      devices: getDevicesForCountryCount(
+        array,
+        selectedGame.app_id,
+        selectedVersion,
+        country,
+      ),
+    }));
+
+    countriesWithDevices = countriesWithCounts.sort((a, b) => {
+      return b.devices - a.devices;
+    });
+
+    console.log(countriesWithDevices);
   };
 
   let isVersionFilterFieldOpen = false;
@@ -120,73 +238,70 @@
     isCountryFilterFieldOpen = !isCountryFilterFieldOpen;
   };
 
+  const showFullNameIfTooLong = (name: string) => {
+    if (name.length > 15) {
+      return name;
+    } else {
+      return null;
+    }
+  };
+
+  const data = {
+    labels: ["D0", "D5", "D10", "D20", "D25", "D30", "D60", "D90"],
+    datasets: [
+      {
+        label: "",
+        data: [100, 19, 3, 5, 2, 3, 1, 1],
+        backgroundColor: ["rgba(98,  182, 239,0.4)"],
+        borderWidth: 2,
+        borderColor: ["rgba(98,  182, 239, 1)"],
+      },
+    ],
+  };
+
+  const calculateChartData = (filteredRetention: Retention[]) => {
+    const days = [0, 5, 10, 20, 25, 30, 60, 90];
+
+    data.datasets[0].label = `% of retention - app version: ${filteredRetention[0].app_ver} in ${filteredRetention[0].country}`;
+
+    data.datasets[0].data = days.map((item) => {
+      return Number(
+        (
+          (filteredRetention[0].days[item] / filteredRetention[0].days[0]) *
+          100
+        ).toFixed(0),
+      );
+    });
+  };
+
+  $: onGameChange(selectedGame);
+
+  const onGameChange = (selectedGame: Game) => {
+    selectedVersion = "All";
+    selectedCountry = "All";
+    retentionFilterFunc();
+    getVersions();
+    getCountriesWithDeviceCounts(retention);
+  };
 </script>
 
 <main>
+  <DropdownMenu
+    {filteredGames}
+    {filteredRetention}
+    {games}
+    {retention}
+    bind:selectedGame
+  />
 
-
-  <!-- ##############---GAME-----######################### -->
-
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <!-- svelte-ignore a11y-no-static-element-interactions -->
   <div class="dropdown">
-    <div class="dropdown-search" on:click={toggleFilterField}>
-      {selectedGame}
-    </div>
     <div
-      class="dropdown-search-open"
-      style="display: {isGameFilterFieldOpen ? 'block' : 'none'};"
+      class="dropdown-search"
+      on:click={toggleVersionFilterField}
+      on:keydown={toggleVersionFilterField}
+      tabindex="0"
+      role="button"
     >
-      <div>
-        <input class="filter-input" on:input={handleGameInput} />
-      </div>
-      <!-- svelte-ignore a11y-click-events-have-key-events -->
-      <!-- svelte-ignore a11y-no-static-element-interactions -->
-      <div
-        class="dropdown-option"
-        on:click={(e) => {
-          e.preventDefault();
-          toggleFilterField();
-          getVersions()
-          filteredRetention = retention;
-          selectedGame = "All";
-          selectedVersion = "All";
-          
-        }}
-      >
-        All
-      </div>
-      {#each filteredGames as game}
-        <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <!-- svelte-ignore a11y-no-static-element-interactions -->
-        <div
-          class="dropdown-option"
-          on:click={(e) => {
-            e.preventDefault();
-            toggleFilterField();
-            getVersions()
-            
-            selectedGame = game.name;
-            selectedVersion = "All";
-
-            filteredRetention = retention.filter((item) => {
-              return game.app_id === item.app_id;
-            });
-          }}
-        >
-          <img src={game.icon} width="20" height="20" alt={game.name} />
-          {game.name}
-        </div>
-      {/each}
-    </div>
-  </div>
-
-  <!-- ##############---VERSION-----######################### -->
-
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <!-- svelte-ignore a11y-no-static-element-interactions -->
-  <div class="dropdown">
-    <div class="dropdown-search" on:click={toggleVersionFilterField}>
       {selectedVersion}
     </div>
     <div
@@ -196,97 +311,148 @@
       <div>
         <input class="filter-input" on:input={handleVersionInput} />
       </div>
-      <!-- svelte-ignore a11y-click-events-have-key-events -->
-      <!-- svelte-ignore a11y-no-static-element-interactions -->
+
       <div
         class="dropdown-option"
+        tabindex="0"
         on:click={(e) => {
           e.preventDefault();
           toggleVersionFilterField();
           filteredRetention = retention;
           selectedVersion = "All";
+          retentionFilterFunc();
+          getCountriesWithDeviceCounts(retention);
+        }}
+        role="button"
+        on:keydown={(e) => {
+          e.preventDefault();
         }}
       >
         All
       </div>
       {#each versions as version}
-        <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <!-- svelte-ignore a11y-no-static-element-interactions -->
         <div
           class="dropdown-option"
+          tabindex="0"
           on:click={(e) => {
             e.preventDefault();
             selectedVersion = version;
             toggleVersionFilterField();
+            retentionFilterFunc();
+            getCountriesWithDeviceCounts(retention);
+            calculateChartData(filteredRetention);
+          }}
+          role="button"
+          on:keydown={(e) => {
+            e.preventDefault();
           }}
         >
           <b>{version}</b> ({getDevicesForVersionsCount(
-            filteredRetention,
+            retention,
+            selectedGame.app_id,
             version,
+            selectedCountry,
           )})
         </div>
       {/each}
     </div>
   </div>
 
-  <!-- ###################-----COUNTRY--------######################### -->
-
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <!-- svelte-ignore a11y-no-static-element-interactions -->
   <div class="dropdown">
-    <div class="dropdown-search" on:click={toggleCountryFilterField}>
-      {selectedCountry}
+    <div
+      class="dropdown-search"
+      tabindex="0"
+      on:click={toggleCountryFilterField}
+      role="button"
+      on:keydown={(e) => {
+        e.preventDefault();
+      }}
+      title={showFullNameIfTooLong(selectedCountry)}
+    >
+      {#if selectedCountry.length > 15}
+        {selectedCountry.slice(0, 15) + "..."}
+      {:else}
+        {selectedCountry}
+      {/if}
     </div>
     <div
       class="dropdown-search-open"
       style="display: {isCountryFilterFieldOpen ? 'block' : 'none'};"
     >
       <div>
-        <input class="filter-input" on:input={handleVersionInput} />
+        <input class="filter-input" on:input={handleCountryInput} />
       </div>
-      <!-- svelte-ignore a11y-click-events-have-key-events -->
-      <!-- svelte-ignore a11y-no-static-element-interactions -->
+
       <div
         class="dropdown-option"
+        tabindex="0"
         on:click={(e) => {
           e.preventDefault();
           toggleCountryFilterField();
-          // filteredRetention = retention;
           selectedCountry = "All";
+          retentionFilterFunc();
+          getVersions();
+        }}
+        role="button"
+        on:keydown={(e) => {
+          e.preventDefault();
         }}
       >
         All
       </div>
-      {#each countries as country}
-        <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <!-- svelte-ignore a11y-no-static-element-interactions -->
+      {#each countriesWithDevices as country}
         <div
           class="dropdown-option"
+          tabindex="0"
           on:click={(e) => {
             e.preventDefault();
-            selectedCountry = country;
+            selectedCountry = country.name;
             toggleCountryFilterField();
+            retentionFilterFunc();
+            getVersions();
+            calculateChartData(filteredRetention);
           }}
+          role="button"
+          on:keydown={(e) => {
+            e.preventDefault();
+          }}
+          title={showFullNameIfTooLong(country.name)}
         >
-          {country}
+          {#if country.name.length > 15}
+            {country.name.slice(0, 15) + "..."} ({country.devices})
+          {:else}
+            {country.name} ({country.devices})
+          {/if}
         </div>
       {/each}
     </div>
   </div>
 
-  <!-- <DropdownMenu
-    {retention}
-    {games}
-    {filteredGames}
-    {filteredRetention}
-    bind:selectedGame={selectedGame}
-  /> -->
+  <button
+    class="button"
+    on:click={() => {
+      showTable = true;
+      showChart = false;
+    }}>Table</button
+  >
+  <button
+    class="button"
+    on:click={() => {
+      calculateChartData(filteredRetention);
+      showTable = false;
+      showChart = true;
+    }}>Chart</button
+  >
 
-  <h4>Game:{selectedGame}<br />Version: {selectedVersion}</h4>
-
-
-<NewMethodFilter />
-
+  {#if showTable}
+    <Table {filteredRetention} />
+  {:else if showChart}
+    {#if filteredRetention.length !== 1}
+      <h3>Select values for all options to see the chart!</h3>
+    {:else}
+      <Bar {data} options={{ responsive: true }} />
+    {/if}
+  {/if}
 </main>
 
 <style>
@@ -308,6 +474,7 @@
   }
 
   .dropdown-search-open {
+    z-index: 10;
     max-width: 300px;
     width: 100%;
     color: #000000;
@@ -334,51 +501,20 @@
     background-color: rgb(145, 199, 250);
   }
 
-  .dropbtn {
-    background-color: #4caf50;
-    color: white;
-    min-width: 200px;
-    padding: 16px;
-    font-size: 16px;
-    border: none;
-    cursor: pointer;
-  }
-
   .dropdown {
     position: relative;
     display: inline-block;
   }
 
-  .dropdown-content {
-    display: none;
-    position: absolute;
-    background-color: #f9f9f9;
-    min-width: 200px;
-    box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
-    z-index: 1;
-  }
-
-  .dropdown-content a {
-    color: black;
-    padding: 12px 16px;
-    text-decoration: none;
-    display: block;
-  }
-
-  .dropdown-content a:hover {
-    background-color: #f1f1f1;
-  }
-
-  .dropdown:hover .dropdown-content {
-    display: block;
-  }
-
-  .dropdown:hover .dropbtn {
-    background-color: #3e8e41;
-  }
-
   ::placeholder {
     color: #fff;
-    opacity: 1; /* Firefox */
+    opacity: 1;
+  }
+
+  .button {
+    padding: 1rem;
+    border: none;
+    background-color: rgb(2, 45, 100);
+    color: #fff;
   }
 </style>
